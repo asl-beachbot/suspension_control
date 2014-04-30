@@ -1,7 +1,0 @@
-set(_CATKIN_CURRENT_PACKAGE "suspension_control")
-set(suspension_control_MAINTAINER "lorenz <lorenz@todo.todo>")
-set(suspension_control_DEPRECATED "")
-set(suspension_control_VERSION "0.0.0")
-set(suspension_control_BUILD_DEPENDS "roscpp" "rospy" "std_msgs")
-set(suspension_control_RUN_DEPENDS "roscpp" "rospy" "std_msgs")
-set(suspension_control_BUILDTOOL_DEPENDS "catkin")
