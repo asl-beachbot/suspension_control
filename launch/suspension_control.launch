@@ -1,9 +1,9 @@
 <launch>
 
-	<group ns="suspension_control">
 		<param name="~framed_id" value="laser_frame"/>
-		<node pkg="suspension_control" name="suspension_control" type="suspension_control" output="screen"/>
 		<node pkg="um6" name="um6_driver" type="um6_driver" output="screen"/>
+	<group ns="suspension_control">
+		<node pkg="suspension_control" name="suspension_control" type="suspension_control" output="screen"/>
 	</group>
 
 

@@ -1,0 +1,8 @@
+prefix=/home/lorenz/catkin_ws/src/suspension_control/devel
+
+Name: suspension_control
+Description: Description of suspension_control
+Version: 0.0.0
+Cflags: 
+Libs: -L/home/lorenz/catkin_ws/src/suspension_control/devel/lib 
+Requires: 

@@ -1,0 +1,8 @@
+prefix=/usr/local
+
+Name: suspension_control
+Description: Description of suspension_control
+Version: 0.0.0
+Cflags: 
+Libs: -L/usr/local/lib 
+Requires: 
