@@ -1,8 +1,9 @@
 <launch>
 
-		<param name="~framed_id" value="laser_frame"/>
-		<node pkg="um6" name="um6_driver" type="um6_driver" output="screen"/>
+	<param name="~framed_id" value="laser_frame"/>
+	<node pkg="um6" name="um6_driver" type="um6_driver" output="screen"/>
 	<group ns="suspension_control">
+		<rosparam command="load" file="$(find suspension_control)/yaml/config.yaml" />
 		<node pkg="suspension_control" name="suspension_control" type="suspension_control" output="screen"/>
 	</group>
 

@@ -4,6 +4,8 @@
 #include "geometry_msgs/PoseStamped.h"
 #include <Eigen/Geometry>
 #include <cmath>
+#include "tf/transform_datatypes.h"
+#include "tf/transform_broadcaster.h"
 
 class SuspensionControl {
  public:
@@ -17,9 +19,7 @@ class SuspensionControl {
     imu_sub_ = n_.subscribe(topic, 1, &SuspensionControl::ImuCallback, this);
     ROS_INFO("Suscribe to IMU topic \"%s\"", topic.c_str());
 
-    const std::string topic_pub = "imu_test";
-    imu_pub_ = n_.advertise<geometry_msgs::PoseStamped>(topic_pub, 1);
-    ROS_INFO("Publishing on topic \"%s\"", topic_pub.c_str());
+    LoadParameters();
   }
 
   ~SuspensionControl() {
@@ -29,11 +29,29 @@ class SuspensionControl {
  private:
   ros::NodeHandle n_;
   ros::Subscriber imu_sub_;
-  ros::Publisher imu_pub_;
   SerialCom serial_com_;
   Eigen::Quaternion<double> attitude_;
   double pitch_set_;
   double roll_set_;
+  bool imu_mounted_;
+  ros::Time time_;
+
+  void PublishTf() {
+		static tf::TransformBroadcaster br;
+		tf::Transform transform;
+		transform.setOrigin( tf::Vector3(0.0, 0.0, 0.0));
+		transform.setRotation(tf::Quaternion(attitude_.x(), attitude_.y(), attitude_.z(), attitude_.w()));
+		br.sendTransform(tf::StampedTransform(transform, time_, "fixed_frame", "laser_frame"));
+	}
+
+  double GetYaw() {
+    sensor_msgs::Imu temp;
+    temp.orientation.x = attitude_.x();
+    temp.orientation.y = attitude_.y();
+    temp.orientation.z = attitude_.z();
+    temp.orientation.w = attitude_.w();
+    return tf::getYaw(temp.orientation);
+  }
 
   Eigen::Vector3d QuaternionToEuler(const Eigen::Quaternion<double> &q) {
   	Eigen::Vector3d euler;
@@ -60,33 +78,30 @@ class SuspensionControl {
   	return euler;
   }
 
-  void ImuCallback(const sensor_msgs::Imu attitude) {
-  	ROS_INFO("Callback");
-  	const double x = attitude.orientation.z;
-  	const double y = -attitude.orientation.y;
-  	const double z = attitude.orientation.x;
-  	const double w = attitude.orientation.w;
-  	attitude_ = Eigen::Quaternion<double>(w,x,y,z);
-  	ROS_INFO("w %f x %f y %f z %f", attitude_.w(), attitude_.x(), attitude_.y(), attitude_.z());
-  	Eigen::Quaternion<double> rot;
-  	rot = Eigen::AngleAxis<double>(-M_PI/2, Eigen::Vector3d(1,0,0));
-  	//attitude_ *= rot;	//correct weird imu cs
-  	rot = Eigen::AngleAxis<double>(M_PI/2, Eigen::Vector3d(0,1,0));
-  	//attitude_ *= rot;	//rotate to sensor mount orientation
-  	Eigen::Vector3d euler = QuaternionToEuler(attitude_);
-  	euler *= 180/M_PI;
-  	ROS_INFO("roll %f pitch %f yaw %f", euler[0], euler[1], euler[2]);
-  	/*geometry_msgs::PoseStamped pub;
-  	pub.header = attitude.header;
-  	pub.pose.orientation.x = attitude_.x();
-  	pub.pose.orientation.y = attitude_.y();
-  	pub.pose.orientation.z = attitude_.z();
-  	pub.pose.orientation.w = attitude_.w();
-  	pub.pose.position.x = 0;
-  	pub.pose.position.y = 0;
-  	pub.pose.position.z = 0;
-  	ROS_INFO("w %f x %f y %f z %f", attitude_.w(), attitude_.x(), attitude_.y(), attitude_.z());
-  	imu_pub_.publish(pub);*/
+  void LoadParameters() {
+  	if (ros::param::get("imu_mounted", imu_mounted_));
+  	else {
+  		ROS_INFO("No config for imu_mounted. Setting true");
+  		imu_mounted_ = true;
+  	}
   }
 
+  void ImuCallback(const sensor_msgs::Imu attitude) {
+  	//ROS_INFO("Callback");
+  	const double x = attitude.orientation.x;
+  	const double y = attitude.orientation.y;
+  	const double z = attitude.orientation.z;
+  	const double w = attitude.orientation.w;
+  	attitude_ = Eigen::Quaternion<double>(w,x,y,z);
+  	Eigen::Quaternion<double> rot;
+  	rot = Eigen::AngleAxis<double>(M_PI/2, Eigen::Vector3d(0,0,1));
+  	attitude_ *= rot;	//correct weird imu cs
+	  if (imu_mounted_) {	
+	  	rot = Eigen::AngleAxis<double>(M_PI/2, Eigen::Vector3d(0,1,0));
+	  	attitude_ *= rot;	//rotate to sensor mount orientation	DISABLED FOR TESTING
+	  }
+  	time_ = attitude.header.stamp;
+    //ROS_INFO("yaw: %f", GetYaw()/M_PI*180);
+  	PublishTf();	//publish new transform
+  }
 };
