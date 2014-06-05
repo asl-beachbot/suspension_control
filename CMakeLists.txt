@@ -5,7 +5,7 @@ project(suspension_control)
 ## Find catkin and any catkin packages
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 find_package(Eigen REQUIRED)
-find_package(catkin REQUIRED COMPONENTS roscpp rospy std_msgs geometry_msgs genmsg tf)
+find_package(catkin REQUIRED COMPONENTS roscpp rospy std_msgs geometry_msgs genmsg tf localization)
 include_directories(${Eigen_INCLUDE_DIRS})
 
 ## Declare ROS messages and services

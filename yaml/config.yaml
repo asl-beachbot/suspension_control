@@ -1,1 +1,1 @@
-imu_mounted: true #set if imu is mounted on laser
+address: "dev/ttyUSB0" #address of motor controller

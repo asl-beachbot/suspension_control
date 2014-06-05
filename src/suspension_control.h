@@ -1,107 +1,71 @@
 #include "ros/ros.h"
 #include "serial_com.h"
-#include "sensor_msgs/Imu.h"
 #include "geometry_msgs/PoseStamped.h"
-#include <Eigen/Geometry>
-#include <cmath>
 #include "tf/transform_datatypes.h"
 #include "tf/transform_broadcaster.h"
+#include "find_plane.cpp"
 
 class SuspensionControl {
  public:
 
-  SuspensionControl() {
-    const std::string addr = "/dev/ttyUSB0";
-    //serial_com_.Open(addr);
-    ROS_INFO("Opened suspension controller at %s", addr.c_str());
-
-    const std::string topic = "/imu/data";
-    imu_sub_ = n_.subscribe(topic, 1, &SuspensionControl::ImuCallback, this);
-    ROS_INFO("Suscribe to IMU topic \"%s\"", topic.c_str());
-
-    LoadParameters();
-  }
-
-  ~SuspensionControl() {
-    //delete &serial_com_;
-  }
-  
- private:
-  ros::NodeHandle n_;
-  ros::Subscriber imu_sub_;
-  SerialCom serial_com_;
-  Eigen::Quaternion<double> attitude_;
-  double pitch_set_;
-  double roll_set_;
-  bool imu_mounted_;
-  ros::Time time_;
-
-  void PublishTf() {
-		static tf::TransformBroadcaster br;
-		tf::Transform transform;
-		transform.setOrigin( tf::Vector3(0.0, 0.0, 0.0));
-		transform.setRotation(tf::Quaternion(attitude_.x(), attitude_.y(), attitude_.z(), attitude_.w()));
-		br.sendTransform(tf::StampedTransform(transform, time_, "fixed_frame", "laser_frame"));
+	SuspensionControl() {
+		std::string addr;
+		if(ros::param::get("address", addr));
+		else {
+			addr = "/dev/ttyUSB0"; ROS_WARN("Didn't find config for motor controller address");
+		}
+		serial_com_.Open(addr);
+		ROS_INFO("Opened suspension controller at %s", addr.c_str());
+		pose_sub_ = n_.subscribe("/localization/bot_pose", 1, &SuspensionControl::PoseCallback, this);
+		pole_sub_ = n_.subscribe("/localization/beach_map", 1, &SuspensionControl::PoleCallback, this);
+		find_plane_ = NULL;
 	}
 
-  double GetYaw() {
-    sensor_msgs::Imu temp;
-    temp.orientation.x = attitude_.x();
-    temp.orientation.y = attitude_.y();
-    temp.orientation.z = attitude_.z();
-    temp.orientation.w = attitude_.w();
-    return tf::getYaw(temp.orientation);
-  }
+	~SuspensionControl() {
+		serial_com_.Close();
+	}
+	
+ private:
+	ros::NodeHandle n_;
+	ros::Subscriber pose_sub_;
+	ros::Subscriber pole_sub_;
+	SerialCom serial_com_;
+	FindPlane *find_plane_;
+	geometry_msgs::PoseStamped pose_;
+	double pitch_set_;
+	double roll_set_;
 
-  Eigen::Vector3d QuaternionToEuler(const Eigen::Quaternion<double> &q) {
-  	Eigen::Vector3d euler;
-  	const double w = q.w();
-  	const double x = q.x();
-  	const double y = q.y();
-  	const double z = q.z();
-  	const double pole = x*y+z*w;
-  	if (pole == 0.5) {
-  		euler[0] = 0;
-  		euler[1] = M_PI/2;
-  		euler[2] = 2*atan2(x,w);
-  	}
-  	else if (pole == -0.5) {
-  		euler[0] = 0;
-  		euler[1] = -M_PI/2;
-  		euler[2] = -2*atan2(x,w);
-  	}
-  	else {
-  		euler[0] = atan2(2*y*w-2*x*z, 1-2*y*y-2*z*z);
-  		euler[1] = asin(2*x*y+2*z*w);
-  		euler[2] = atan2(2*x*w-2*y*z, 1-2*x*x-2*z*z);
-  	}
-  	return euler;
-  }
+	void UpdatePlane() {
+		find_plane_->CalcPlaneMin(pose_.pose);
+		roll_set_ = find_plane_->GetRoll();
+		pitch_set_ = find_plane_->GetPitch();
+		const int roll_data = roll_set_ / M_PI * 180 * 1000;
+		const int pitch_data = pitch_set_ / M_PI * 180 * 1000;
+		stringstream ss;
+		ss << "roll " << roll_data << " pitch " << pitch_data;
+		serial_com_.Send(ss.str() );
+	}
 
-  void LoadParameters() {
-  	if (ros::param::get("imu_mounted", imu_mounted_));
-  	else {
-  		ROS_INFO("No config for imu_mounted. Setting true");
-  		imu_mounted_ = true;
-  	}
-  }
+	void PoseCallback(const geometry_msgs::PoseStamped attitude) {
+		pose_ = pose;
+		if (find_plane_ != NULL) UpdatePlane();
+	}
 
-  void ImuCallback(const sensor_msgs::Imu attitude) {
-  	//ROS_INFO("Callback");
-  	const double x = attitude.orientation.x;
-  	const double y = attitude.orientation.y;
-  	const double z = attitude.orientation.z;
-  	const double w = attitude.orientation.w;
-  	attitude_ = Eigen::Quaternion<double>(w,x,y,z);
-  	Eigen::Quaternion<double> rot;
-  	rot = Eigen::AngleAxis<double>(M_PI/2, Eigen::Vector3d(0,0,1));
-  	attitude_ *= rot;	//correct weird imu cs
-	  if (imu_mounted_) {	
-	  	rot = Eigen::AngleAxis<double>(M_PI/2, Eigen::Vector3d(0,1,0));
-	  	attitude_ *= rot;	//rotate to sensor mount orientation	DISABLED FOR TESTING
-	  }
-  	time_ = attitude.header.stamp;
-    //ROS_INFO("yaw: %f", GetYaw()/M_PI*180);
-  	PublishTf();	//publish new transform
-  }
+	void PoleCallback(const localization::beach_map map) {
+		std::vector<Pole::Line> lines;
+		for (int i = 0; i < map.lines.size(); i++) {
+			Pole::Line line;
+			line.p.x() = map.lines[i].p.x;
+			line.p.y() = map.lines[i].p.y;
+			line.p.z() = map.lines[i].p.z;
+			line.u.x() = map.lines[i].u.x;
+			line.u.y() = map.lines[i].u.y;
+			line.u.z() = map.lines[i].u.z;
+			line.end.x() = map.lines[i].end.x;
+			line.end.y() = map.lines[i].end.y;
+			line.end.z() = map.lines[i].end.z;
+			line.d = map.lines[i].d;
+		}
+		find_plane_ = new FindPlane(lines);
+	}
 };
