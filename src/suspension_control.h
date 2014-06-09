@@ -66,6 +66,7 @@ class SuspensionControl {
 			line.end.y() = beach_map.lines[i].end.y;
 			line.end.z() = beach_map.lines[i].end.z;
 			line.d = beach_map.lines[i].d;
+			lines.push_back(line);
 		}
 		find_plane_ = new FindPlane(lines);
 	}

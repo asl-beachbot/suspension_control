@@ -76,7 +76,7 @@ class FindPlane {
 	
   FindPlane(const std::vector<Pole::Line> &lines) {
   	lines_ = lines;
-  	n_poles_ = lines.size();
+    n_poles_ = lines.size();
   	marker_pub_ = n_.advertise<visualization_msgs::Marker>("/lines", 10, true);
   	geometry_msgs::Pose pose;
   	pose.position.x = 0;
