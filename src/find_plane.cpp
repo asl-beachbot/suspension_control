@@ -3,8 +3,8 @@
 #include <cassert>
 #include <Eigen/Dense>
 #include <iostream>
-#include "helper.cpp"
 #include "tf/transform_datatypes.h"
+#include "localization/pole.h"
 
 class FindPlane {
  public:
@@ -74,7 +74,7 @@ class FindPlane {
   	return pitch_;
   }
 	
-  FindPlane(const std::vector<Line> &lines) {
+  FindPlane(const std::vector<Pole::Line> &lines) {
   	lines_ = lines;
   	n_poles_ = lines.size();
   	marker_pub_ = n_.advertise<visualization_msgs::Marker>("/lines", 10, true);
@@ -87,7 +87,7 @@ class FindPlane {
 
  private:
 
-  std::vector<Line> lines_;
+  std::vector<Pole::Line> lines_;
   int n_poles_;
   static const double laser_height = 0.35;	//height of laser above ground
   static const double punish = 0.1;		//factor by which to punish invisible poles

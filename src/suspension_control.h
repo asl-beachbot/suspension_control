@@ -1,5 +1,6 @@
 #include "ros/ros.h"
-#include "serial_com.h"
+#include <localization/serial_com.h>
+#include "localization/beach_map.h"
 #include "geometry_msgs/PoseStamped.h"
 #include "tf/transform_datatypes.h"
 #include "tf/transform_broadcaster.h"
@@ -36,35 +37,35 @@ class SuspensionControl {
 	double roll_set_;
 
 	void UpdatePlane() {
-		find_plane_->CalcPlaneMin(pose_.pose);
+		find_plane_->CalcAnglesMin(pose_.pose);
 		roll_set_ = find_plane_->GetRoll();
 		pitch_set_ = find_plane_->GetPitch();
-		const int roll_data = roll_set_ / M_PI * 180 * 1000;
-		const int pitch_data = pitch_set_ / M_PI * 180 * 1000;
+		const int roll_data = -roll_set_ / M_PI * 180 * 1000;
+		const int pitch_data = -pitch_set_ / M_PI * 180 * 1000;
 		stringstream ss;
 		ss << "set roll " << roll_data << " pitch " << pitch_data;
 		serial_com_.Send(ss.str() );
 	}
 
-	void PoseCallback(const geometry_msgs::PoseStamped attitude) {
+	void PoseCallback(const geometry_msgs::PoseStamped pose) {
 		pose_ = pose;
 		if (find_plane_ != NULL) UpdatePlane();
 	}
 
-	void PoleCallback(const localization::beach_map map) {
+	void PoleCallback(const localization::beach_map beach_map) {
 		std::vector<Pole::Line> lines;
-		for (int i = 0; i < map.lines.size(); i++) {
+		for (int i = 0; i < beach_map.lines.size(); i++) {
 			Pole::Line line;
-			line.p.x() = map.lines[i].p.x;
-			line.p.y() = map.lines[i].p.y;
-			line.p.z() = map.lines[i].p.z;
-			line.u.x() = map.lines[i].u.x;
-			line.u.y() = map.lines[i].u.y;
-			line.u.z() = map.lines[i].u.z;
-			line.end.x() = map.lines[i].end.x;
-			line.end.y() = map.lines[i].end.y;
-			line.end.z() = map.lines[i].end.z;
-			line.d = map.lines[i].d;
+			line.p.x() = beach_map.lines[i].p.x;
+			line.p.y() = beach_map.lines[i].p.y;
+			line.p.z() = beach_map.lines[i].p.z;
+			line.u.x() = beach_map.lines[i].u.x;
+			line.u.y() = beach_map.lines[i].u.y;
+			line.u.z() = beach_map.lines[i].u.z;
+			line.end.x() = beach_map.lines[i].end.x;
+			line.end.y() = beach_map.lines[i].end.y;
+			line.end.z() = beach_map.lines[i].end.z;
+			line.d = beach_map.lines[i].d;
 		}
 		find_plane_ = new FindPlane(lines);
 	}

@@ -15,7 +15,7 @@ class SerialCom {
  		data.append("\n");
 		char *out_buf = (char*)data.c_str();
     serial_port.write(out_buf, data.length());
-    Listen();
+    //Listen();
  	}
 
  	void Open(const std::string &addr) {
