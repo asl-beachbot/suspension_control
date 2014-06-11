@@ -10,34 +10,34 @@ class FindPlane {
  public:
 
   void CalcAnglesMin(const geometry_msgs::Pose &pose) {
-  	Eigen::VectorXd l(n_poles_), beta(n_poles_), w(n_poles_), alpha_t(n_poles_), c(2);
-		const double pose_x = pose.position.x; const double pose_y = pose.position.y; const double pose_z = 0.0;
-		const double pose_th = tf::getYaw(pose.orientation);
-  	for (int i = 0; i < n_poles_; i++) {
-  		const double px = lines_[i].p.x(); const double py = lines_[i].p.y(); const double pz = lines_[i].p.z(); 
-  		const double endx = lines_[i].end.x(); const double endy = lines_[i].end.y(); const double endz = lines_[i].end.z(); 
-  		l(i) = sqrt((px - pose_x) * (px - pose_x) + (py - pose_y) * (py - pose_y));
-  		beta(i) = atan2(py - pose_y, px - pose_x) - pose_th;
-  		NormalizeAngle(beta(i));
-  		alpha_t(i) = atan2(endz - laser_height, l(i)) - atan2(laser_height - pz, l(i)) / 2;	//calc target angle
-  	}
-  	Eigen::MatrixXd A = Eigen::MatrixXd::Zero(2, 2);
-  	c = Eigen::Vector2d::Zero();
-  	const double l_max = l.maxCoeff();
-  	for (int i = 0; i < n_poles_; i++) {	//second loop because l_max needs to be known
-  		w(i) = 1 * (l(i) / l_max) * (l(i) / l_max);	//punish for being close
-  		if (std::abs(beta(i)) > M_PI*3/4) w(i) *= punish;	//punish if pole is not visible
-  		A(0,0) += 2 * sin(beta(i)) * sin(beta(i)) * w(i); 
-  		A(0,1) += 2 * sin(beta(i)) * cos(beta(i)) * w(i);
-  		A(1,0) += 2 * cos(beta(i)) * sin(beta(i)) * w(i); 
-  		A(1,1) += 2 * cos(beta(i)) * cos(beta(i)) * w(i);
-  		c(0) += 2 * sin(beta(i)) * alpha_t(i) * w(i);
-  		c(1) += 2 * cos(beta(i)) * alpha_t(i) * w(i);
-  	} 
-  	Eigen::Vector2d solution = A.colPivHouseholderQr().solve(c);	//QR-solve 
-  	ROS_INFO("roll %f pitch %f", solution.x(), solution.y());
-  	roll_ = solution.x(); pitch_ = solution.y();	
-  	PublishMarker(l, beta);
+    Eigen::VectorXd l(n_poles_), beta(n_poles_), w(n_poles_), alpha_t(n_poles_), c(2);
+    const double pose_x = pose.position.x; const double pose_y = pose.position.y; const double pose_z = 0.0;
+    const double pose_th = tf::getYaw(pose.orientation);
+    for (int i = 0; i < n_poles_; i++) {
+      const double px = lines_[i].p.x(); const double py = lines_[i].p.y(); const double pz = lines_[i].p.z(); 
+      const double endx = lines_[i].end.x(); const double endy = lines_[i].end.y(); const double endz = lines_[i].end.z(); 
+      l(i) = sqrt((px - pose_x) * (px - pose_x) + (py - pose_y) * (py - pose_y));
+      beta(i) = atan2(py - pose_y, px - pose_x) - pose_th;
+      NormalizeAngle(beta(i));
+      alpha_t(i) = (atan2(endz - laser_height, l(i)) + atan2(pz - laser_height, l(i) ) ) / 2; //calc target angle
+    }
+    Eigen::MatrixXd A = Eigen::MatrixXd::Zero(2, 2);
+    c = Eigen::Vector2d::Zero();
+    const double l_max = l.maxCoeff();
+    for (int i = 0; i < n_poles_; i++) {  //second loop because l_max needs to be known
+      w(i) = 1 * (l(i) / l_max) * (l(i) / l_max); //punish for being close
+      if (std::abs(beta(i)) > M_PI*3/4) w(i) *= punish; //punish if pole is not visible
+      A(0,0) += 2 * sin(beta(i)) * sin(beta(i)) * w(i); 
+      A(0,1) += -2 * sin(beta(i)) * cos(beta(i)) * w(i);
+      A(1,0) += -2 * cos(beta(i)) * sin(beta(i)) * w(i); 
+      A(1,1) += 2 * cos(beta(i)) * cos(beta(i)) * w(i);
+      c(0) += 2 * sin(beta(i)) * alpha_t(i) * w(i);
+      c(1) += -2 * cos(beta(i)) * alpha_t(i) * w(i);
+    } 
+    Eigen::Vector2d solution = A.colPivHouseholderQr().solve(c);  //QR-solve 
+    ROS_INFO("roll %f pitch %f", solution.x(), solution.y());
+    roll_ = solution.x(); pitch_ = solution.y();  
+    PublishMarker(l, beta);
   }
 
   void CalcAnglesOpt(const geometry_msgs::Pose &pose) {
@@ -50,14 +50,15 @@ class FindPlane {
       l(i) = sqrt((px - pose_x) * (px - pose_x) + (py - pose_y) * (py - pose_y));
       beta(i) = atan2(py - pose_y, px - pose_x) - pose_th;
       NormalizeAngle(beta(i));
-      alpha_t(i) = atan2(endz - laser_height, l(i)) - atan2(laser_height - pz, l(i)) / 2; //calc target angle
+      alpha_t(i) = (atan2(endz - laser_height, l(i)) + atan2(pz - laser_height, l(i) ) ) / 2; //calc target angle
     }
     Eigen::MatrixXd A(n_poles_, 2);
     const double l_max = l.maxCoeff();
     for (int i = 0; i < n_poles_; i++) {  //second loop because l_max needs to be known
       w(i) = 1 * (l(i) / l_max) * (l(i) / l_max); //punish for being close
       if (std::abs(beta(i)) > M_PI*3/4) w(i) *= punish; //punish if pole is not visible
-      A(i,0) = sin(beta(i)) * w(i); A(i,1) = cos(beta(i)) * w(i);
+      A(i,0) = sin(beta(i)) * w(i); 
+      A(i,1) = -cos(beta(i)) * w(i);
       c(i) = alpha_t(i) * w(i);
     } 
     Eigen::Vector2d solution = A.colPivHouseholderQr().solve(c);  //QR-solve 
