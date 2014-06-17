@@ -41,7 +41,7 @@ class SuspensionControl {
 		roll_set_ = find_plane_->GetRoll();
 		pitch_set_ = find_plane_->GetPitch();
 		const int roll_data = -roll_set_ / M_PI * 180 * 1000;
-		const int pitch_data = -pitch_set_ / M_PI * 180 * 1000;
+		const int pitch_data = pitch_set_ / M_PI * 180 * 1000;
 		stringstream ss;
 		ss << "set roll " << roll_data << " pitch " << pitch_data;
 		serial_com_.Send(ss.str() );

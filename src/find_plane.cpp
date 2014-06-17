@@ -91,7 +91,7 @@ class FindPlane {
   std::vector<Pole::Line> lines_;
   int n_poles_;
   static const double laser_height = 0.35;	//height of laser above ground
-  static const double punish = 0.1;		//factor by which to punish invisible poles
+  static const double punish = 0.01;		//factor by which to punish invisible poles
   double pitch_, roll_;
   ros::NodeHandle n_;
   ros::Publisher marker_pub_;
